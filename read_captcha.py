@@ -1,37 +1,84 @@
 # coding=utf-8
-from PIL import Image
-
-from libs import iteration
-from libs import convert_to_text
+from PIL import Image, ImageEnhance, ImageFilter
+from pytesseract import image_to_string
+import os
 
 
 def main():
-    #im = image_process('yzm.jpg')
-    im = Image.open('yzm.jpg')
-    im = iteration.iterate(im, 10)
-    text = convert_to_text.get_string_from_image(im)
+    directory = 'captchas'
+    error_num = 0
+    file_count = 0
+    for filename in os.listdir(directory):
+        if filename.endswith(".jpg"):
+            file_count += 1
+            img_name = os.path.join(directory, filename)
+            im = image_process(img_name)
+            text = image_to_string(im, config="-psm 7 digits")
+            print text
+            if len(text) == 4 and text.isdigit():
+                new_name = os.path.join(directory, text + '.jpg')
+                os.rename(img_name, new_name)
+            else:
+                error_num += 1
 
-    print text
+    print 'Error: {0} / {1}'.format(error_num, file_count)
 
 
 def image_process(img_path):
     image = Image.open(img_path)
-    imgry = image.convert('L')
+    image = binarizing(image, 140)
+    # image.save('binarizing.jpg')
+    image = depoint(image)
+    # image.save('depoint.jpg')
+    n = 2
+    while(n > 1):
+        image = image.filter(ImageFilter.MedianFilter())
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(1)
+        n = n - 1
+    # image.save('enhance.jpg')
 
-    table = get_bin_table()
-    out = imgry.point(table, '1')
-    return out
+    return image
 
 
-def get_bin_table(threshold=140):
-    table = []
-    for i in range(256):
-        if i < threshold:
-            table.append(0)
-        else:
-            table.append(1)
+def binarizing(img, threshold):
+    img = img.convert('L')
+    pixdata = img.load()
+    w, h = img.size
+    for y in range(h):
+        for x in range(w):
+            if(pixdata[x, y] < threshold):
+                pixdata[x, y] = 0
+            else:
+                pixdata[x, y] = 255
+    return img
 
-    return table
+
+def depoint(img):
+    pixdata = img.load()
+    w, h = img.size
+    for y in range(1, h - 1):
+        for x in range(1, w - 1):
+            count = 0
+            if pixdata[x, y - 1] < 5:
+                count = count + 1
+            if pixdata[x, y + 1] < 5:
+                count = count + 1
+            if pixdata[x - 1, y] < 5:  # 左
+                count = count + 1
+            if pixdata[x + 1, y] < 5:  # 右
+                count = count + 1
+            if pixdata[x - 1, y - 1] < 5:  # 左上
+                count = count + 1
+            if pixdata[x - 1, y + 1] < 5:  # 左下
+                count = count + 1
+            if pixdata[x + 1, y - 1] < 5:  # 右上
+                count = count + 1
+            if pixdata[x + 1, y + 1] < 5:  # 右下
+                count = count + 1
+            if count > 4:
+                pixdata[x, y] = 0
+    return img
 
 
 def sum_9_region(img, x, y):

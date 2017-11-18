@@ -25,6 +25,3 @@ def vote():
     # print r.json()
     # print r.text.encode('utf-8')
     # print r.text.decode('utf-8').encode('gb2312')
-
-
-def download_captcha():
