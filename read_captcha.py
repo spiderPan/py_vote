@@ -1,42 +1,26 @@
 # coding=utf-8
 from PIL import Image, ImageEnhance, ImageFilter
-from pytesseract import image_to_string
 import os
-
+import uuid
 
 def main():
     directory = 'captchas'
-    error_num = 0
     file_count = 0
     for filename in os.listdir(directory):
         if filename.endswith(".jpg"):
             file_count += 1
             img_name = os.path.join(directory, filename)
-            im = image_process(img_name)
-            text = image_to_string(im, config="-psm 7 digits")
-            print text
-            if len(text) == 4 and text.isdigit():
-                new_name = os.path.join(directory, text + '.jpg')
-                os.rename(img_name, new_name)
-            else:
-                error_num += 1
+            cut_img(img_name)
 
-    print 'Error: {0} / {1}'.format(error_num, file_count)
+    print 'Finished: {0}'.format(file_count)
 
 
 def image_process(img_path):
     image = Image.open(img_path)
-    image = binarizing(image, 140)
-    # image.save('binarizing.jpg')
-    image = depoint(image)
-    # image.save('depoint.jpg')
-    n = 2
-    while(n > 1):
-        image = image.filter(ImageFilter.MedianFilter())
-        enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(1)
-        n = n - 1
-    # image.save('enhance.jpg')
+    image = image.filter(ImageFilter.MedianFilter())
+    enhancer = ImageEnhance.Contrast(image)
+    image = enhancer.enhance(1)
+    image = image.convert('L')
 
     return image
 
@@ -165,6 +149,28 @@ def sum_9_region(img, x, y):
                 + img.getpixel((x + 1, y)) \
                 + img.getpixel((x + 1, y + 1))
             return 9 - sum
+
+
+def segment(im):
+    s = 12
+    w = 18
+    h = 36
+    t = 0
+    im_new = []
+    for i in range(4):
+        im1 = im.crop((s + w * i, t, s + w * (i + 1), h))
+        im_new.append(im1)
+    return im_new
+
+
+def cut_img(img):
+    cut_difrectory = 'sep_capt'
+    im = image_process(img)
+    pics = segment(im)
+    for pic in pics:
+        ran_text = str(uuid.uuid4())
+        new_name = os.path.join(cut_difrectory, ran_text + '.jpg')
+        pic.save(new_name)
 
 if __name__ == "__main__":
     main()
